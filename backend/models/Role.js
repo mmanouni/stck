@@ -7,6 +7,13 @@ const roleSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
+roleSchema.pre('save', function (next) {
+  if (!Array.isArray(this.permissions) || this.permissions.length === 0) {
+    return next(new Error('Permissions must be a non-empty array.'));
+  }
+  next();
+});
+
 const predefinedRoles = [
   {
     name: 'superadmin',
@@ -20,6 +27,7 @@ const predefinedRoles = [
       'manage_categories',
       'view_audit_logs',
       'manage_licenses',
+      'view_analytics', // New permission
     ],
   },
   {

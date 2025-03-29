@@ -99,14 +99,15 @@ router.get('/stats', async (req, res) => {
   try {
     const totalProducts = await Product.countDocuments();
     const totalStockValue = await Product.aggregate([
-      { $group: { _id: null, totalValue: { $sum: { $multiply: ["$price", "$quantity"] } } } }
+      { $group: { _id: null, totalValue: { $sum: { $multiply: ['$price', '$quantity'] } } } },
     ]);
     res.json({
       totalProducts,
       totalStockValue: totalStockValue[0]?.totalValue || 0,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error fetching inventory stats:', err.message);
+    res.status(500).json({ error: 'Failed to fetch inventory stats.' });
   }
 });
 

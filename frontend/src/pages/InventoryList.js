@@ -195,13 +195,15 @@ function InventoryList() {
   };
 
   return (
-    <div style={{ direction: language === 'ar' ? 'rtl' : 'ltr' }}>
+    <div style={{ direction: language === 'ar' ? 'rtl' : 'ltr', padding: '20px' }}>
       <h1>{translate('inventory')}</h1>
       {loading && <CircularProgress />}
       {!loading && products.length === 0 && <Typography>No Products Found</Typography>}
-      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div>
-          <Button variant="contained" onClick={handleExport}>Export to CSV</Button>
+          <Button variant="contained" onClick={handleExport} style={{ marginRight: '10px' }}>
+            Export to CSV
+          </Button>
           <Input type="file" onChange={handleBulkUpload} />
         </div>
         <IconButton onClick={toggleViewMode}>

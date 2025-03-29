@@ -53,6 +53,7 @@ router.post('/activate', async (req, res) => {
     license.activatedAt = new Date();
     license.bindToHardware(hardwareId); // Bind to hardware ID
     license.usageHistory.push({ action: 'activate' });
+    license.logUsageAction('activate'); // Log usage action
     await license.save();
 
     // Disable email notifications
@@ -61,7 +62,7 @@ router.post('/activate', async (req, res) => {
     res.json({ message: 'License activated successfully' });
   } catch (err) {
     console.error(`Error during license activation: ${err.message}`);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Failed to activate license. Please contact support.' });
   }
 });
 
@@ -87,6 +88,7 @@ router.post('/deactivate', authenticate, async (req, res) => {
     license.activatedAt = null;
     license.expiresAt = null;
     license.usageHistory.push({ action: 'deactivate' });
+    license.logUsageAction('deactivate'); // Log usage action
     await license.save();
 
     // Disable email notifications
@@ -95,7 +97,7 @@ router.post('/deactivate', authenticate, async (req, res) => {
     res.json({ message: 'License deactivated successfully' });
   } catch (err) {
     console.error(`Error during license deactivation: ${err.message}`);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Failed to deactivate license. Please contact support.' });
   }
 });
 
@@ -131,7 +133,7 @@ router.get('/validate', async (req, res) => {
     res.json({ valid: true });
   } catch (err) {
     console.error(`Error during license validation: ${err.message}`);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Failed to validate license. Please try again later.' });
   }
 });
 
@@ -188,7 +190,7 @@ router.delete('/admin/delete/:id', authenticate, authorize(['admin']), async (re
 // Admin: List all licenses
 router.get('/admin/list', authenticate, authorize(['admin']), async (req, res) => {
   try {
-    const licenses = await License.find();
+    const licenses = await License.find().select('key isActive usageCount maxUsage'); // Project necessary fields
     res.json(licenses);
   } catch (err) {
     console.error(`Error fetching license list: ${err.message}`);
@@ -231,6 +233,25 @@ router.get('/analytics', authenticate, authorize(['admin']), async (req, res) =>
   } catch (err) {
     console.error(`Error fetching analytics: ${err.message}`);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get detailed license usage analytics
+router.get('/usage-analytics', authenticate, authorize(['admin']), async (req, res) => {
+  try {
+    const analytics = await License.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalLicenses: { $sum: 1 },
+          activeLicenses: { $sum: { $cond: ['$isActive', 1, 0] } },
+          maxUsageExceeded: { $sum: { $cond: [{ $gte: ['$usageCount', '$maxUsage'] }, 1, 0] } },
+        },
+      },
+    ]);
+    res.json(analytics[0] || { totalLicenses: 0, activeLicenses: 0, maxUsageExceeded: 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

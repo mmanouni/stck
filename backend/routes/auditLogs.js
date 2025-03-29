@@ -12,13 +12,15 @@ router.get('/', authenticate, authorize(['admin']), async (req, res) => {
     const query = action ? { action: { $regex: action, $options: 'i' } } : {};
     const logs = await AuditLog.find(query)
       .populate('userId', 'username')
+      .select('userId action timestamp') // Project only necessary fields
       .skip((page - 1) * limit)
       .limit(parseInt(limit))
       .sort({ timestamp: -1 });
     const total = await AuditLog.countDocuments(query);
     res.json({ logs, total, page: parseInt(page), limit: parseInt(limit) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error fetching audit logs:', err.message);
+    res.status(500).json({ error: 'Failed to fetch audit logs. Please try again later.' });
   }
 });
 
@@ -50,6 +52,24 @@ router.get('/export', authenticate, authorize(['admin']), async (req, res) => {
     csvStream.pipe(res);
     logs.forEach((log) => csvStream.write(log.toObject()));
     csvStream.end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get analytics for user activity logs
+router.get('/analytics', authenticate, authorize(['admin']), async (req, res) => {
+  try {
+    const analytics = await UserActivityLog.aggregate([
+      {
+        $group: {
+          _id: '$action',
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+    res.json(analytics);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

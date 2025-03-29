@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Button, Pagination, List, ListItem, CircularProgress } from '@mui/material';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Button, Pagination, List, ListItem, CircularProgress, Typography } from '@mui/material';
+import { Line } from 'react-chartjs-2';
 import { io } from 'socket.io-client';
 import { DatePicker } from '@mui/x-date-pickers';
 
@@ -13,6 +14,7 @@ function AuditLogs() {
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
+  const [logTrends, setLogTrends] = useState([]);
 
   useEffect(() => {
     setLoading(true);
@@ -33,6 +35,12 @@ function AuditLogs() {
       setRealTimeLogs(prevLogs => [data, ...prevLogs].slice(0, 10)); // Keep only the latest 10 logs
     });
     return () => socket.disconnect();
+  }, []);
+
+  useEffect(() => {
+    axios.get('/api/audit-logs/trends')
+      .then(response => setLogTrends(response.data))
+      .catch(error => console.error(error));
   }, []);
 
   const handleFilterChange = (e) => {
@@ -65,10 +73,26 @@ function AuditLogs() {
       .finally(() => setLoading(false));
   };
 
+  const logTrendsData = {
+    labels: logTrends.map(log => log._id),
+    datasets: [
+      {
+        label: 'Logs Over Time',
+        data: logTrends.map(log => log.count),
+        fill: false,
+        borderColor: '#36A2EB',
+      },
+    ],
+  };
+
   return (
     <div>
       <h1>Audit Logs</h1>
       {loading && <CircularProgress />}
+      <div style={{ marginBottom: '20px' }}>
+        <Typography variant="h6">Logs Over Time</Typography>
+        <Line data={logTrendsData} />
+      </div>
       <TextField
         label="Filter by Action"
         variant="outlined"

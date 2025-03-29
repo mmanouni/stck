@@ -20,6 +20,11 @@ const licenseSchema = new mongoose.Schema({
   hardwareId: { type: String, required: false }, // Store hashed hardware ID
 });
 
+// Add indexes for better performance
+licenseSchema.index({ key: 1 }); // Index for faster key lookups
+licenseSchema.index({ isActive: 1 }); // Index for active/inactive queries
+licenseSchema.index({ expiresAt: 1 }); // Index for expiry-related queries
+
 // Pre-save hook to hash the license key
 licenseSchema.pre('save', function (next) {
   if (this.isModified('key')) {
@@ -43,6 +48,15 @@ licenseSchema.methods.bindToHardware = function (hardwareId) {
 licenseSchema.methods.validateHardware = function (hardwareId) {
   const hashedHardwareId = crypto.createHash('sha256').update(hardwareId).digest('hex');
   return this.hardwareId === hashedHardwareId;
+};
+
+// Log license usage action
+licenseSchema.methods.logUsageAction = function (action) {
+  if (this.usageCount >= this.maxUsage && action === 'activate') {
+    throw new Error('License usage limit exceeded.');
+  }
+  this.usageHistory.push({ action, timestamp: new Date() });
+  return this.save();
 };
 
 module.exports = mongoose.model('License', licenseSchema);

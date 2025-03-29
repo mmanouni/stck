@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Grid, Card, CardContent, Typography, Select, MenuItem, Button, Pagination, TextField, CircularProgress, Tooltip, InputAdornment } from '@mui/material';
+import { Pie } from 'react-chartjs-2';
 import SearchIcon from '@mui/icons-material/Search';
 
 function UserRoles() {
@@ -17,6 +18,7 @@ function UserRoles() {
   const [roleFilter, setRoleFilter] = useState(''); // New state for role filter
   const [categoryFilter, setCategoryFilter] = useState(''); // New state for category filter
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]); // New state for selected category IDs
+  const [roleDistribution, setRoleDistribution] = useState([]); // New state for role distribution
 
   const roleDescriptions = {
     admin: 'Has full access to all features and settings.',
@@ -46,6 +48,10 @@ function UserRoles() {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     })
       .then(response => setCategories(response.data))
+      .catch(error => console.error(error));
+
+    axios.get('/api/roles/distribution')
+      .then(response => setRoleDistribution(response.data))
       .catch(error => console.error(error));
   }, [page, sort, isActiveFilter, roleFilter, categoryFilter]);
 
@@ -170,10 +176,24 @@ function UserRoles() {
     user.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const roleDistributionData = {
+    labels: roleDistribution.map(role => role._id),
+    datasets: [
+      {
+        data: roleDistribution.map(role => role.count),
+        backgroundColor: ['#36A2EB', '#FF6384', '#FFCE56', '#4CAF50', '#F44336'],
+      },
+    ],
+  };
+
   return (
     <div style={{ direction: language === 'ar' ? 'rtl' : 'ltr' }}>
       <h1>User Roles</h1>
       {loading && <CircularProgress />}
+      <div style={{ marginBottom: '20px' }}>
+        <Typography variant="h6">{language === 'ar' ? 'توزيع الأدوار' : 'Role Distribution'}</Typography>
+        <Pie data={roleDistributionData} />
+      </div>
       <TextField
         label="Search Users"
         variant="outlined"

@@ -73,9 +73,12 @@ Before setting up the project, ensure the following are installed on your system
    JWT_SECRET=your_jwt_secret
    LICENSE_ENCRYPTION_KEY=your_32_byte_hex_key
    LICENSE_ENCRYPTION_IV=your_16_byte_hex_iv
+   EMAIL_USER=your_email@example.com
+   EMAIL_PASS=your_email_password
    ```
    - Replace `your_jwt_secret` with a secure secret key for JWT.
    - Replace `your_32_byte_hex_key` and `your_16_byte_hex_iv` with valid encryption keys.
+   - Replace `your_email@example.com` and `your_email_password` with valid email credentials for notifications.
 3. Install backend dependencies:
    ```bash
    npm install
@@ -161,29 +164,11 @@ npm test
 
 ---
 
-## Contributing
-We welcome contributions! To contribute:
-1. Fork the repository.
-2. Create a new branch for your feature or bugfix:
-   ```bash
-   git checkout -b feature-name
-   ```
-3. Commit your changes:
-   ```bash
-   git commit -m "Add feature-name"
-   ```
-4. Push to your fork:
-   ```bash
-   git push origin feature-name
-   ```
-5. Open a pull request.
-
----
-
 ## Troubleshooting
 - **MongoDB not running**: Ensure MongoDB is installed and running.
 - **Missing dependencies**: Run `npm install` in both backend and frontend directories.
 - **Environment variables**: Verify `.env` files for typos or missing values.
+- **Port conflicts**: Ensure no other services are running on ports `5000` or `3000`.
 
 ---
 

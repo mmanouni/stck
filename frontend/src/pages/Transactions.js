@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, TextField, Dialog, DialogActions, DialogContent, DialogTitle, CircularProgress } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
-import { Pie } from 'react-chartjs-2';
+import { Pie, Bar } from 'react-chartjs-2';
 
 function Transactions() {
   const [transactions, setTransactions] = useState([]);
@@ -108,12 +108,31 @@ function Transactions() {
     ],
   };
 
+  const incomeExpenseBarChartData = {
+    labels: transactions.map(t => new Date(t.date).toLocaleDateString()),
+    datasets: [
+      {
+        label: 'Income',
+        data: transactions.filter(t => t.type === 'income').map(t => t.amount),
+        backgroundColor: '#36A2EB',
+      },
+      {
+        label: 'Expense',
+        data: transactions.filter(t => t.type === 'expense').map(t => t.amount),
+        backgroundColor: '#FF6384',
+      },
+    ],
+  };
+
   return (
     <div style={{ direction: language === 'ar' ? 'rtl' : 'ltr' }}>
       <h1>{language === 'ar' ? 'المعاملات' : 'Transactions'}</h1>
       {loading && <CircularProgress />}
       <div style={{ marginBottom: '20px' }}>
         <Pie data={incomeExpenseChartData} />
+      </div>
+      <div style={{ marginBottom: '20px' }}>
+        <Bar data={incomeExpenseBarChartData} />
       </div>
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
         <DatePicker
