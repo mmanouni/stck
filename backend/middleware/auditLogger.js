@@ -2,6 +2,10 @@ const AuditLog = require('../models/AuditLog');
 
 const auditLogger = (action) => async (req, res, next) => {
   try {
+    if (!req.user || !req.user.id) {
+      console.warn('Audit log skipped: Missing user information.');
+      return next();
+    }
     const log = new AuditLog({
       userId: req.user.id,
       action,

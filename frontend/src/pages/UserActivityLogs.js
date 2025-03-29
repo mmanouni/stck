@@ -37,7 +37,10 @@ function UserActivityLogs() {
   useEffect(() => {
     axios.get('/api/user-activity-logs/analytics')
       .then(response => setActivityAnalytics(response.data))
-      .catch(error => console.error(error));
+      .catch(error => {
+        console.error('Error fetching analytics:', error);
+        alert('Failed to fetch analytics data.');
+      });
   }, []);
 
   const activityAnalyticsData = {

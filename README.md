@@ -65,6 +65,7 @@ Before setting up the project, ensure the following are installed on your system
 1. Navigate to the backend directory:
    ```bash
    cd backend
+   npm install express-session express-rate-limit helmet express-mongo-sanitize xss-clean express-validator
    ```
 2. Create a `.env` file in the `backend` directory:
    ```plaintext

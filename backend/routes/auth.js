@@ -176,7 +176,7 @@ router.post('/password-reset', async (req, res) => {
 router.post('/password-reset/:token', async (req, res) => {
   try {
     const { token } = req.params;
-    const { password } = req.body;
+    const password = sanitize(req.body.password); // Add sanitization
     const resetToken = await PasswordResetToken.findOne({ token });
     if (!resetToken) return res.status(400).json({ error: 'Invalid or expired token' });
 
