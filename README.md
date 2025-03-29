@@ -25,11 +25,9 @@ Before setting up the project, ensure the following are installed on your system
      npm -v
      ```
 
-2. **npm** or **yarn**:
+2. **npm**:
    - npm comes bundled with Node.js. If you prefer yarn, install it globally:
-     ```bash
-     npm install -g yarn
-     ```
+
 
 3. **MongoDB**:
    - Download and install MongoDB from [MongoDB official website](https://www.mongodb.com/try/download/community).
@@ -42,7 +40,15 @@ Before setting up the project, ensure the following are installed on your system
      mongo
      ```
 
-4. **Git**:
+4. **MongoDB Shell (Mongosh)**:
+   - Download and install Mongosh from [Mongosh Official Website](https://www.mongodb.com/try/download/shell).
+   - Verify installation:
+     ```bash
+     where mongosh
+     ```
+
+
+5. **Git**:
    - Download and install Git from [Git official website](https://git-scm.com/).
    - Verify installation:
      ```bash
@@ -67,6 +73,9 @@ Before setting up the project, ensure the following are installed on your system
    cd backend
    npm install express-session express-rate-limit helmet express-mongo-sanitize xss-clean express-validator
    ```
+
+2. 
+
 2. Create a `.env` file in the `backend` directory:
    ```plaintext
    PORT=5000

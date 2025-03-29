@@ -1,9 +1,6 @@
 # VS Code settings
 .vscode/
 
-
-
-
 # Node modules
 node_modules/
 npm-debug.log*
@@ -22,9 +19,6 @@ stck/backend/data/db/
 logs/
 *.log
 
-# VS Code settings
-.vscode/
-
 # Build files
 dist/
 build/
@@ -34,7 +28,6 @@ build/
 Thumbs.db
 
 # IDE/Editor files
-.vscode/
 .idea/
 *.swp
 
