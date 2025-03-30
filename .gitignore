@@ -13,6 +13,13 @@ logs/
 build/
 dist/
 
+# Database Files
+backend/data/db/journal/
+backend/data/db/diagnostic.data/
+backend/data/db/*
+
+backend/npm-debug.log
+
 # Environment
 .env
 .env.local
@@ -57,3 +64,4 @@ react-chartjs-2/
 
 # Ensure public directory is not ignored
 !public/
+backend/data/db/ 
