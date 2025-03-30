@@ -20,3 +20,11 @@ module.exports.devServer = (config) => {
 // Example:
 // const util = require('util');
 // const extended = Object.assign({}, obj1, obj2); // Replace util._extend
+
+module.exports = {
+  rules: {
+    // Remove or replace the following if it exists
+    // "no-unused-expressions": "off",
+    // Add other rules as needed
+  },
+};

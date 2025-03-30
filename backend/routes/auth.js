@@ -6,27 +6,15 @@ const Category = require('../models/Category');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { body, validationResult } = require('express-validator');
-const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const userActivityLogger = require('../middleware/userActivityLogger');
 const checkPermission = require('../middleware/permission');
+const { authenticateUser } = require('../middleware/auth');
+const sanitize = require('mongo-sanitize'); // Ensure this is imported
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'default_jwt_secret'; // Use environment variable
 const upload = multer({ dest: 'uploads/profile-pictures/' });
-
-// Middleware to verify JWT for general users
-const authenticateUser = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-};
 
 // Middleware to verify JWT for admin users
 const authenticateAdmin = (req, res, next) => {
@@ -81,7 +69,9 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const { username, password, role } = sanitize(req.body);
+      const username = sanitize(req.body.username); // Sanitize input
+      const password = sanitize(req.body.password); // Sanitize input
+      const { role } = req.body;
       const newUser = new User({ username, password, role });
       await newUser.save();
       res.status(201).json({ message: 'User registered successfully' });
@@ -92,24 +82,14 @@ router.post(
 );
 
 // Enhanced login logging
-router.post('/login', loginLimiter, async (req, res) => {
-  const { username, password } = sanitize(req.body); // Remove mfaToken
-  const maxAttempts = 5;
-  const lockoutTime = 15 * 60 * 1000; // 15 minutes
-
+router.post('/login', async (req, res) => {
   try {
+    const username = sanitize(req.body.username); // Sanitize input
+    const password = sanitize(req.body.password); // Sanitize input
     const user = await User.findOne({ username });
     if (!user || !(await user.comparePassword(password))) {
-      if (user) await user.incrementFailedLoginAttempts();
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-
-    if (user.isLocked()) {
-      return res.status(429).json({ error: 'Account locked. Try again later.' });
-    }
-
-    user.failedLoginAttempts = 0; // Reset failed attempts on successful login
-    await user.save();
 
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
@@ -129,8 +109,7 @@ router.post('/logout', authenticateUser, userActivityLogger('Logout'), (req, res
 // Fetch current user's profile
 router.get('/profile', authenticateUser, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password -__v');
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const user = await User.findById(req.user.id).select('-password');
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -192,7 +171,7 @@ router.post('/password-reset', async (req, res) => {
 router.post('/password-reset/:token', async (req, res) => {
   try {
     const { token } = req.params;
-    const password = sanitize(req.body.password); // Add sanitization
+    const password = req.body.password; // Add sanitization
     const resetToken = await PasswordResetToken.findOne({ token });
     if (!resetToken) return res.status(400).json({ error: 'Invalid or expired token' });
 
@@ -261,7 +240,7 @@ router.put('/users/:id/role', authenticateAdmin, authorize(['admin']), async (re
 });
 
 // Deactivate a user account (admin only)
-router.put('/users/:id/deactivate', authenticateAdmin, authorize(['admin']), userActivityLogger('Deactivate User'), async (req, res) => {
+router.put('/users/:id/deactivate', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -272,7 +251,7 @@ router.put('/users/:id/deactivate', authenticateAdmin, authorize(['admin']), use
 });
 
 // Reactivate a user account (admin only)
-router.put('/users/:id/reactivate', authenticateAdmin, authorize(['admin']), userActivityLogger('Reactivate User'), async (req, res) => {
+router.put('/users/:id/reactivate', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(req.params.id, { isActive: true }, { new: true });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -436,9 +415,4 @@ router.put('/users/:id/remove-category-permissions', authenticateAdmin, authoriz
   }
 });
 
-module.exports = {
-  router, // Ensure the router is exported
-  authenticateUser,
-  authenticateAdmin,
-  authorize, // Ensure authorize is exported
-};
+module.exports = router;

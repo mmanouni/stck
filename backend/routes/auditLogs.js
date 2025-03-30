@@ -1,7 +1,7 @@
 const express = require('express');
 const AuditLog = require('../models/AuditLog');
 const router = express.Router();
-const { authenticateUser, authorize } = require('../routes/auth'); // Corrected import path
+const { authenticateUser, authorize } = require('../middleware/auth'); // Corrected import path
 const csv = require('fast-csv'); // Add missing import
 
 // Get audit logs with pagination and filtering

@@ -7,6 +7,7 @@ const fs = require('fs');
 const multer = require('multer');
 const auditLogger = require('../middleware/auditLogger'); // Corrected import path
 const { MongoClient } = require('mongodb');
+const sanitize = require('mongo-sanitize'); // Ensure this is imported
 const uri = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const client = new MongoClient(uri);
 
@@ -39,7 +40,7 @@ router.get('/:id', async (req, res) => {
 // Search products by name or category
 router.get('/search', async (req, res) => {
   try {
-    const { query } = req.query;
+    const query = sanitize(req.query.query); // Sanitize input
     const products = await Product.find({
       $or: [
         { name: { $regex: query, $options: 'i' } },
@@ -125,7 +126,8 @@ router.get('/category-stats', async (req, res) => {
 // Bulk upload products
 router.post('/bulk-upload', upload.single('file'), async (req, res) => {
   try {
-    if (!req.file || req.file.mimetype !== 'text/csv') {
+    const sanitizedFile = sanitize(req.file); // Sanitize file input
+    if (!sanitizedFile || sanitizedFile.mimetype !== 'text/csv') {
       return res.status(400).json({ error: 'Invalid file type. Only CSV files are allowed.' });
     }
 
@@ -134,17 +136,22 @@ router.post('/bulk-upload', upload.single('file'), async (req, res) => {
       .pipe(csv.parse({ headers: true }))
       .on('data', (row) => products.push(row))
       .on('end', async () => {
-        await client.connect();
-        const db = client.db('stck');
-        await db.collection('inventory').insertMany(products);
-        fs.unlinkSync(req.file.path); // Clean up the uploaded file
-        res.status(201).json({ message: 'Products uploaded successfully' });
+        try {
+          await client.connect();
+          const db = client.db('stck');
+          await db.collection('inventory').insertMany(products);
+          fs.unlinkSync(req.file.path); // Clean up the uploaded file
+          res.status(201).json({ message: 'Products uploaded successfully' });
+        } catch (err) {
+          console.error('Error during bulk upload:', err);
+          res.status(500).json({ error: 'Internal server error' });
+        } finally {
+          await client.close();
+        }
       });
   } catch (err) {
     console.error('Error during bulk upload:', err);
     res.status(500).json({ error: 'Internal server error' });
-  } finally {
-    await client.close();
   }
 });
 

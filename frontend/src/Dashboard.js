@@ -11,7 +11,7 @@ root.render(
 );
 
 <Grid container spacing={2}>
-  <Grid xs={12} sm={6} md={4}> {/* Remove `item` prop */}
+  <Grid xs={12} sm={6} md={4}>
     {/* ...existing code... */}
   </Grid>
 </Grid>;

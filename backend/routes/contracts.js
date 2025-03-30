@@ -1,6 +1,7 @@
 const express = require('express');
 const Contract = require('../models/Contract');
-const { authenticateAdmin, authorize } = require('../routes/auth');
+const { authenticateUser, authorize } = require('../middleware/auth'); // Corrected import path
+const authenticateAdmin = require('../middleware/authenticateAdmin'); // Ensure this is imported
 const jsPDF = require('jspdf');
 const router = express.Router();
 

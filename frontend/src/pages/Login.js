@@ -29,7 +29,7 @@ function Login() {
         document.cookie = `token=${response.data.token}; Secure; SameSite=Strict`;
         navigate('/');
       })
-      .catch((error) => alert('Login failed: ' + error.response.data.error));
+      .catch((error) => alert('Login failed: ' + (error.response?.data?.error || 'Unknown error')));
   };
 
   return (

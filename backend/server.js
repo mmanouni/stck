@@ -6,15 +6,16 @@ const cors = require('cors');
 const session = require('express-session');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
+const mongoSanitize = require('mongo-sanitize'); // Ensure this is imported
 const xss = require('xss-clean');
 const path = require('path');
 const { csrfProtection, generateCsrfToken } = require('./middleware/csrfProtection');
 const userActivityLogger = require('./middleware/userActivityLogger');
 const errorHandler = require('./middleware/errorHandler');
+const connectDB = require('./config/db'); // Import the DB connection logic
 
 // Correctly import and use routes
-const authRoutes = require('./routes/auth').router; // Corrected import path
+const authRoutes = require('./routes/auth'); // Corrected import path
 const inventoryRoutes = require('./routes/inventory'); // Ensure inventory route is registered
 const auditLogRoutes = require('./routes/auditLogs'); // Corrected import path
 const transactionRoutes = require('./routes/transactions'); // Corrected import path
@@ -37,7 +38,12 @@ const io = new Server(server, {
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000', credentials: true }));
 app.use(helmet());
 app.use(express.json());
-app.use(mongoSanitize());
+app.use((req, res, next) => {
+  req.body = mongoSanitize(req.body);
+  req.query = mongoSanitize(req.query);
+  req.params = mongoSanitize(req.params);
+  next();
+});
 app.use(xss());
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your_session_secret',
@@ -47,20 +53,15 @@ app.use(session({
 }));
 
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => {
-    console.error('Failed to connect to MongoDB:', err.message);
-    process.exit(1);
-  });
+connectDB();
 
 // Routes
 app.use('/api/auth', csrfProtection, authRoutes);
-app.use('/api/inventory', inventoryRoutes); // Ensure inventory route is registered
+app.use('/api/inventory', inventoryRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/license', licenseRoutes);
-app.use('/api/contracts', contractRoutes); // Add contract routes
+app.use('/api/contracts', contractRoutes);
 
 // WebSocket setup
 io.on('connection', (socket) => {

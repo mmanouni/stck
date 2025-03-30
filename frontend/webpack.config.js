@@ -3,7 +3,7 @@ const path = require('path');
 module.exports = {
   resolve: {
     fallback: {
-      crypto: false, // Ensure compatibility with OpenSSL 3.0
+      crypto: false,
     },
   },
   output: {
@@ -14,11 +14,14 @@ module.exports = {
     moduleIds: 'deterministic',
   },
   experiments: {
-    topLevelAwait: true, // Optional, if needed
+    topLevelAwait: true,
   },
   devServer: {
     setupMiddlewares: (middlewares, devServer) => {
-      // Add your middleware logic here
+      if (!devServer) {
+        throw new Error('webpack-dev-server is not defined');
+      }
+      // Add custom middleware here if needed
       return middlewares;
     },
   },

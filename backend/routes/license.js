@@ -1,7 +1,7 @@
 const express = require('express');
 const License = require('../models/License');
 const router = express.Router();
-const { authenticateUser, authorize } = require('../routes/auth'); // Corrected import path
+const { authenticateUser, authorize } = require('../middleware/auth'); // Corrected import path
 const sanitize = require('mongo-sanitize');
 const validator = require('validator');
 const crypto = require('crypto');
@@ -32,13 +32,13 @@ const decryptLicenseKey = (encryptedKey) => {
 };
 
 // Activate a license
-router.post('/activate', async (req, res) => {
+router.post('/activate', authenticateUser, async (req, res) => {
   try {
-    const encryptedKey = sanitize(req.body.key);
+    const encryptedKey = sanitize(req.body.key); // Sanitize input
     const licenseKey = decryptLicenseKey(encryptedKey); // Decrypt the key
     const hashedKey = crypto.createHash('sha256').update(licenseKey).digest('hex'); // Hash the key
-    const email = sanitize(req.body.email);
-    const hardwareId = sanitize(req.body.hardwareId);
+    const email = sanitize(req.body.email); // Sanitize input
+    const hardwareId = sanitize(req.body.hardwareId); // Sanitize input
 
     if (!validator.isEmail(email)) {
       return res.status(400).json({ error: 'Invalid email address' });
@@ -52,7 +52,6 @@ router.post('/activate', async (req, res) => {
     license.activatedAt = new Date();
     license.bindToHardware(hardwareId); // Bind to hardware ID
     license.usageHistory.push({ action: 'activate' });
-    license.logUsageAction('activate'); // Log usage action
     await license.save();
 
     res.json({ message: 'License activated successfully' });
