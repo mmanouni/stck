@@ -1,26 +1,20 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'; // Corrected import
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
-import Dashboard from './pages/Dashboard';
-import Profile from './pages/Profile';
-import ErrorBoundary from './ErrorBoundary';
+import InventoryList from './pages/InventoryList';
+import Contracts from './pages/Contracts';
+import ThemeSwitcher from './components/ThemeSwitcher';
 
 function App() {
   return (
     <Router>
-      <Navbar />
-      <Routes> {/* Replace Switch with Routes */}
-        <Route path="/" element={
-          <ErrorBoundary>
-            <Dashboard />
-          </ErrorBoundary>
-        } />
-        <Route path="/profile" element={
-          <ErrorBoundary>
-            <Profile />
-          </ErrorBoundary>
-        } />
-      </Routes>
+      <ThemeSwitcher>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<InventoryList />} />
+          <Route path="/contracts" element={<Contracts />} />
+        </Routes>
+      </ThemeSwitcher>
     </Router>
   );
 }

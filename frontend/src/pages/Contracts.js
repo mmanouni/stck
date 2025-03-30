@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Button, Typography, Dialog, DialogContent, DialogActions } from '@mui/material';
+import { Button, Typography, Dialog, DialogContent, DialogActions, CircularProgress } from '@mui/material';
 
 function Contracts() {
   const [contracts, setContracts] = useState([]);
-  const [selectedContract, setSelectedContract] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [language, setLanguage] = useState('en'); // Add language state
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchContracts();
@@ -14,62 +12,27 @@ function Contracts() {
 
   const fetchContracts = async () => {
     try {
-      const response = await axios.get('/api/contracts/history', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
+      const response = await axios.get('/api/contracts');
       setContracts(response.data);
-    } catch (err) {
-      console.error(err);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching contracts:', error);
     }
   };
 
-  const handleAccept = async (id) => {
-    setLoading(true);
-    try {
-      await axios.post(`/api/contracts/accept/${id}`, {}, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      alert('Contract accepted successfully');
-      fetchContracts();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (loading) {
+    return <CircularProgress />;
+  }
 
   return (
-    <div style={{ direction: language === 'ar' ? 'rtl' : 'ltr' }}>
+    <div>
       <Typography variant="h4">Contracts</Typography>
       {contracts.map((contract) => (
         <div key={contract._id}>
-          <Typography>Version: {contract.version}</Typography>
-          <Typography>Changelog: {contract.changelog}</Typography>
-          <Typography>Accepted By: {contract.acceptedBy?.username || 'Not Accepted'}</Typography>
-          <Button onClick={() => setSelectedContract(contract)}>View</Button>
-          {!contract.acceptedAt && (
-            <Button onClick={() => handleAccept(contract._id)} disabled={loading}>
-              Accept
-            </Button>
-          )}
+          <Typography variant="h6">{contract.name}</Typography>
+          <Typography>{contract.details}</Typography>
         </div>
       ))}
-
-      {selectedContract && (
-        <Dialog open={true} onClose={() => setSelectedContract(null)}>
-          <DialogContent>
-            <Typography>Version: {selectedContract.version}</Typography>
-            <Typography>Changelog: {selectedContract.changelog}</Typography>
-            <Typography>Buyer Details:</Typography>
-            <Typography>Company Name: {selectedContract.buyerDetails.companyName}</Typography>
-            <Typography>Address: {selectedContract.buyerDetails.address}</Typography>
-            <Typography>Representative Name: {selectedContract.buyerDetails.representativeName}</Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setSelectedContract(null)}>Close</Button>
-          </DialogActions>
-        </Dialog>
-      )}
     </div>
   );
 }

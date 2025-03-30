@@ -3,7 +3,7 @@ const path = require('path');
 module.exports = {
   resolve: {
     fallback: {
-      crypto: false,
+      crypto: require.resolve('crypto-browserify'),
     },
   },
   output: {
@@ -26,3 +26,18 @@ module.exports = {
     },
   },
 };
+
+
+
+onAfterSetupMiddleware: function(app, server) {
+  // your middleware code
+},
+onBeforeSetupMiddleware: function(app, server) {
+  // your middleware code
+}
+
+
+setupMiddlewares: function(middlewares, devServer) {
+  // your middleware code
+  return middlewares;
+}

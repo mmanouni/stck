@@ -1,7 +1,7 @@
 const { override, addBabelPlugins, addBabelPreset } = require('customize-cra');
 
 module.exports = override(
-  addBabelPreset('@babel/preset-env'),
+  addBabelPreset(['@babel/preset-env', { targets: "> 0.25%, not dead" }]),
   ...addBabelPlugins(
     '@babel/plugin-transform-nullish-coalescing-operator',
     '@babel/plugin-transform-optional-chaining'
