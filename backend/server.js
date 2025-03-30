@@ -1,3 +1,5 @@
+require('dotenv').config(); // Ensure this is at the top of the file
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -8,14 +10,16 @@ const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const path = require('path');
 const { csrfProtection, generateCsrfToken } = require('./middleware/csrfProtection');
-const authRoutes = require('./routes/auth');
-const inventoryRoutes = require('./routes/inventory');
-const auditLogRoutes = require('./routes/auditLogs');
-const transactionRoutes = require('./routes/transactions');
-const licenseRoutes = require('./routes/license');
 const userActivityLogger = require('./middleware/userActivityLogger');
 const errorHandler = require('./middleware/errorHandler');
-require('dotenv').config();
+
+// Correctly import and use routes
+const authRoutes = require('./routes/auth').router; // Corrected import path
+const inventoryRoutes = require('./routes/inventory'); // Ensure inventory route is registered
+const auditLogRoutes = require('./routes/auditLogs'); // Corrected import path
+const transactionRoutes = require('./routes/transactions'); // Corrected import path
+const licenseRoutes = require('./routes/license'); // Corrected import path
+const contractRoutes = require('./routes/contracts'); // Import contract routes
 
 if (!process.env.MONGO_URI || !process.env.JWT_SECRET || !process.env.SESSION_SECRET) {
   console.error('Missing required environment variables. Check your .env file.');
@@ -43,7 +47,7 @@ app.use(session({
 }));
 
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB connected'))
   .catch(err => {
     console.error('Failed to connect to MongoDB:', err.message);
@@ -52,10 +56,11 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
 
 // Routes
 app.use('/api/auth', csrfProtection, authRoutes);
-app.use('/api/inventory', inventoryRoutes);
+app.use('/api/inventory', inventoryRoutes); // Ensure inventory route is registered
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/license', licenseRoutes);
+app.use('/api/contracts', contractRoutes); // Add contract routes
 
 // WebSocket setup
 io.on('connection', (socket) => {

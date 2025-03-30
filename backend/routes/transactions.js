@@ -1,120 +1,68 @@
 const express = require('express');
-const Transaction = require('../models/Transaction');
 const router = express.Router();
-const { authenticate, authorize } = require('./auth');
+const { MongoClient } = require('mongodb');
 
-// Get all transactions
-router.get('/', authenticate, authorize(['admin']), async (req, res) => {
+const uri = process.env.MONGO_URI || 'mongodb://localhost:27017';
+const client = new MongoClient(uri);
+
+// Get transactions summary
+router.get('/summary', async (req, res) => {
   try {
-    const transactions = await Transaction.find().sort({ date: -1 });
+    await client.connect();
+    const db = client.db('stck');
+    const transactions = await db.collection('transactions').find({}).toArray();
+
+    if (transactions.length === 0) {
+      return res.status(404).json({ error: 'No transactions found' });
+    }
+
     res.json(transactions);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error('Error fetching transactions summary:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await client.close();
   }
 });
 
 // Add a new transaction
-router.post('/', authenticate, authorize(['admin']), async (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    const { type, amount, description, category } = req.body;
-    const transaction = new Transaction({ type, amount, description, category });
-    await transaction.save();
-    res.status(201).json(transaction);
+    const { transactionId, amount, date } = req.body;
+
+    await client.connect();
+    const db = client.db('stck');
+    const newTransaction = { transactionId, amount, date };
+    await db.collection('transactions').insertOne(newTransaction);
+
+    res.status(201).json(newTransaction);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('Error adding transaction:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await client.close();
   }
 });
 
 // Delete a transaction
-router.delete('/:id', authenticate, authorize(['admin']), async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    await Transaction.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Transaction deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    const { id } = req.params;
 
-// Get transactions filtered by date range
-router.get('/filter', authenticate, authorize(['admin']), async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    const query = {};
-    if (startDate) query.date = { $gte: new Date(startDate) };
-    if (endDate) query.date = { ...query.date, $lte: new Date(endDate) };
-    const transactions = await Transaction.find(query).sort({ date: -1 });
-    res.json(transactions);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    await client.connect();
+    const db = client.db('stck');
+    const result = await db.collection('transactions').deleteOne({ _id: new MongoClient.ObjectId(id) });
 
-// Get monthly summary of transactions
-router.get('/summary', authenticate, authorize(['admin']), async (req, res) => {
-  try {
-    const summary = await Transaction.aggregate([
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$date' } },
-          totalIncome: {
-            $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] },
-          },
-          totalExpense: {
-            $sum: { $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0] },
-          },
-        },
-      },
-      { $sort: { _id: -1 } },
-    ]);
-    res.json(summary);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
 
-// Get yearly summary of transactions
-router.get('/yearly-summary', authenticate, authorize(['admin']), async (req, res) => {
-  try {
-    const summary = await Transaction.aggregate([
-      {
-        $group: {
-          _id: { $year: '$date' },
-          totalIncome: {
-            $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] },
-          },
-          totalExpense: {
-            $sum: { $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0] },
-          },
-        },
-      },
-      { $sort: { _id: -1 } },
-    ]);
-    res.json(summary);
+    res.json({ message: 'Transaction deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Get category-based summary of transactions
-router.get('/category-summary', authenticate, authorize(['admin']), async (req, res) => {
-  try {
-    const summary = await Transaction.aggregate([
-      {
-        $group: {
-          _id: '$category',
-          totalIncome: {
-            $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] },
-          },
-          totalExpense: {
-            $sum: { $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0] },
-          },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-    res.json(summary);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error deleting transaction:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await client.close();
   }
 });
 

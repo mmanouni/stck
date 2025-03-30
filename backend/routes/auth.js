@@ -6,7 +6,7 @@ const Category = require('../models/Category');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { body, validationResult } = require('express-validator');
-const mongoSanitize  = require('express-mongo-sanitize');
+const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const userActivityLogger = require('../middleware/userActivityLogger');
@@ -14,6 +14,43 @@ const checkPermission = require('../middleware/permission');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'default_jwt_secret'; // Use environment variable
 const upload = multer({ dest: 'uploads/profile-pictures/' });
+
+// Middleware to verify JWT for general users
+const authenticateUser = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+// Middleware to verify JWT for admin users
+const authenticateAdmin = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    }
+    req.user = decoded;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+// Middleware for role-based access
+const authorize = (roles) => (req, res, next) => {
+  if (!roles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+};
 
 // Rate limiting for login and registration
 const authLimiter = rateLimit({
@@ -82,36 +119,15 @@ router.post('/login', loginLimiter, async (req, res) => {
 });
 
 // Logout a user
-router.post('/logout', authenticate, userActivityLogger('Logout'), (req, res) => {
+router.post('/logout', authenticateUser, userActivityLogger('Logout'), (req, res) => {
   req.session.destroy((err) => {
     if (err) return res.status(500).json({ error: 'Failed to log out' });
     res.json({ message: 'Logged out successfully' });
   });
 });
 
-// Middleware to verify JWT
-const authenticate = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-};
-
-// Middleware for role-based access
-const authorize = (roles) => (req, res, next) => {
-  if (!roles.includes(req.user.role)) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  next();
-};
-
 // Fetch current user's profile
-router.get('/profile', authenticate, async (req, res) => {
+router.get('/profile', authenticateUser, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password -__v');
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -122,7 +138,7 @@ router.get('/profile', authenticate, async (req, res) => {
 });
 
 // Update user profile with activity logging
-router.put('/profile', authenticate, userActivityLogger('Update Profile'), async (req, res) => {
+router.put('/profile', authenticateUser, userActivityLogger('Update Profile'), async (req, res) => {
   try {
     const { username, password } = req.body;
     const user = await User.findById(req.user.id);
@@ -136,7 +152,7 @@ router.put('/profile', authenticate, userActivityLogger('Update Profile'), async
 });
 
 // Upload profile picture
-router.post('/profile-picture', authenticate, upload.single('profilePicture'), async (req, res) => {
+router.post('/profile-picture', authenticateUser, upload.single('profilePicture'), async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     user.profilePicture = req.file.path;
@@ -148,7 +164,7 @@ router.post('/profile-picture', authenticate, upload.single('profilePicture'), a
 });
 
 // Deactivate user account with reason
-router.put('/profile/deactivate', authenticate, userActivityLogger('Deactivate Account'), async (req, res) => {
+router.put('/profile/deactivate', authenticateUser, userActivityLogger('Deactivate Account'), async (req, res) => {
   try {
     const { reason } = req.body;
     const user = await User.findById(req.user.id);
@@ -191,7 +207,7 @@ router.post('/password-reset/:token', async (req, res) => {
 });
 
 // Refresh JWT token
-router.post('/refresh-token', authenticate, async (req, res) => {
+router.post('/refresh-token', authenticateUser, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -204,7 +220,7 @@ router.post('/refresh-token', authenticate, async (req, res) => {
 });
 
 // Get users with filtering and sorting (admin only)
-router.get('/users', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/users', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const { page = 1, limit = 10, sort = 'username', isActive, role } = req.query;
     const query = {};
@@ -223,7 +239,7 @@ router.get('/users', authenticate, authorize(['admin']), async (req, res) => {
 });
 
 // Fetch a specific user's details (admin only)
-router.get('/users/:id', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/users/:id', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password -__v');
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -234,7 +250,7 @@ router.get('/users/:id', authenticate, authorize(['admin']), async (req, res) =>
 });
 
 // Update user role (admin only)
-router.put('/users/:id/role', authenticate, authorize(['admin']), async (req, res) => {
+router.put('/users/:id/role', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const { role } = req.body;
     const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true });
@@ -245,7 +261,7 @@ router.put('/users/:id/role', authenticate, authorize(['admin']), async (req, re
 });
 
 // Deactivate a user account (admin only)
-router.put('/users/:id/deactivate', authenticate, authorize(['admin']), userActivityLogger('Deactivate User'), async (req, res) => {
+router.put('/users/:id/deactivate', authenticateAdmin, authorize(['admin']), userActivityLogger('Deactivate User'), async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -256,7 +272,7 @@ router.put('/users/:id/deactivate', authenticate, authorize(['admin']), userActi
 });
 
 // Reactivate a user account (admin only)
-router.put('/users/:id/reactivate', authenticate, authorize(['admin']), userActivityLogger('Reactivate User'), async (req, res) => {
+router.put('/users/:id/reactivate', authenticateAdmin, authorize(['admin']), userActivityLogger('Reactivate User'), async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(req.params.id, { isActive: true }, { new: true });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -267,7 +283,7 @@ router.put('/users/:id/reactivate', authenticate, authorize(['admin']), userActi
 });
 
 // Delete a user account (admin only)
-router.delete('/users/:id', authenticate, authorize(['admin']), userActivityLogger('Delete User'), async (req, res) => {
+router.delete('/users/:id', authenticateAdmin, authorize(['admin']), userActivityLogger('Delete User'), async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -278,7 +294,7 @@ router.delete('/users/:id', authenticate, authorize(['admin']), userActivityLogg
 });
 
 // Reset MFA for a user (admin only)
-router.post('/users/:id/reset-mfa', authenticate, authorize(['admin']), async (req, res) => {
+router.post('/users/:id/reset-mfa', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -291,7 +307,7 @@ router.post('/users/:id/reset-mfa', authenticate, authorize(['admin']), async (r
 });
 
 // Admin or manager: Delegate role to a user
-router.put('/users/:id/delegate-role', authenticate, authorize(['admin', 'manager']), async (req, res) => {
+router.put('/users/:id/delegate-role', authenticateAdmin, authorize(['admin', 'manager']), async (req, res) => {
   try {
     const { role, expiresAt } = req.body;
     if (role === 'admin') return res.status(403).json({ error: 'Cannot delegate admin role' });
@@ -307,7 +323,7 @@ router.put('/users/:id/delegate-role', authenticate, authorize(['admin', 'manage
 });
 
 // Admin or manager: Suspend a user account
-router.put('/users/:id/suspend', authenticate, authorize(['admin', 'manager']), async (req, res) => {
+router.put('/users/:id/suspend', authenticateAdmin, authorize(['admin', 'manager']), async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -321,7 +337,7 @@ router.put('/users/:id/suspend', authenticate, authorize(['admin', 'manager']), 
 });
 
 // Admin or manager: Unsuspend a user account
-router.put('/users/:id/unsuspend', authenticate, authorize(['admin', 'manager']), async (req, res) => {
+router.put('/users/:id/unsuspend', authenticateAdmin, authorize(['admin', 'manager']), async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -334,7 +350,7 @@ router.put('/users/:id/unsuspend', authenticate, authorize(['admin', 'manager'])
 });
 
 // Get user roles (admin only)
-router.get('/roles', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/roles', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const roles = ['admin', 'user'];
     res.json(roles);
@@ -344,7 +360,7 @@ router.get('/roles', authenticate, authorize(['admin']), async (req, res) => {
 });
 
 // Create a new category (admin only)
-router.post('/categories', authenticate, checkPermission('create_category'), async (req, res) => {
+router.post('/categories', authenticateAdmin, checkPermission('create_category'), async (req, res) => {
   try {
     const { name, description } = req.body;
     const category = new Category({ name, description });
@@ -356,7 +372,7 @@ router.post('/categories', authenticate, checkPermission('create_category'), asy
 });
 
 // Get all categories
-router.get('/categories', authenticate, async (req, res) => {
+router.get('/categories', authenticateUser, async (req, res) => {
   try {
     const categories = await Category.find();
     res.json(categories);
@@ -366,7 +382,7 @@ router.get('/categories', authenticate, async (req, res) => {
 });
 
 // Assign a user to a category (admin only)
-router.put('/users/:id/category', authenticate, authorize(['admin']), async (req, res) => {
+router.put('/users/:id/category', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const { categoryId } = req.body;
     const user = await User.findById(req.params.id);
@@ -380,7 +396,7 @@ router.put('/users/:id/category', authenticate, authorize(['admin']), async (req
 });
 
 // Admin: Add permissions to a category
-router.put('/categories/:id/permissions', authenticate, authorize(['admin']), async (req, res) => {
+router.put('/categories/:id/permissions', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const { permissions } = req.body;
     const category = await Category.findByIdAndUpdate(req.params.id, { permissions }, { new: true });
@@ -392,7 +408,7 @@ router.put('/categories/:id/permissions', authenticate, authorize(['admin']), as
 });
 
 // Admin: Assign category permissions to a user
-router.put('/users/:id/category-permissions', authenticate, authorize(['admin']), async (req, res) => {
+router.put('/users/:id/category-permissions', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const { categoryIds } = req.body;
     const user = await User.findByIdAndUpdate(req.params.id, { categoryPermissions: categoryIds }, { new: true });
@@ -404,7 +420,7 @@ router.put('/users/:id/category-permissions', authenticate, authorize(['admin'])
 });
 
 // Admin: Remove category permissions from a user
-router.put('/users/:id/remove-category-permissions', authenticate, authorize(['admin']), async (req, res) => {
+router.put('/users/:id/remove-category-permissions', authenticateAdmin, authorize(['admin']), async (req, res) => {
   try {
     const { categoryIds } = req.body;
     const user = await User.findById(req.params.id);
@@ -420,4 +436,9 @@ router.put('/users/:id/remove-category-permissions', authenticate, authorize(['a
   }
 });
 
-module.exports = { router, authenticate, authorize };
+module.exports = {
+  router, // Ensure the router is exported
+  authenticateUser,
+  authenticateAdmin,
+  authorize, // Ensure authorize is exported
+};

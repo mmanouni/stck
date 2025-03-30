@@ -1,4 +1,4 @@
-const AuditLog = require('../models/AuditLog');
+const AuditLog = require('../models/AuditLog'); // Corrected import path
 
 const auditLogger = (action) => async (req, res, next) => {
   try {

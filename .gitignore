@@ -1,35 +1,34 @@
-# VS Code settings
-.vscode/
-
-# Node modules
+# Node.js
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# MongoDB database files
-stck/backend/data/db/
+# Logs
+logs/
+*.log
+*.log.*
 
-# Environment files
+# Build
+build/
+dist/
+
+# Environment
 .env
 .env.local
 .env.*.local
 
-# Logs
-logs/
-*.log
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
 
-# Build files
-dist/
-build/
-
-# OS/System files
+# Miscellaneous
 .DS_Store
 Thumbs.db
 
-# IDE/Editor files
-.idea/
-*.swp
+# MongoDB database files
+stck/backend/data/db/
 
 # Temporary files
 *.tmp
@@ -37,3 +36,24 @@ Thumbs.db
 
 # Additional OS/System files
 Desktop.ini
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Debugging files
+*.stackdump
+*.pid
+*.seed
+
+# Miscellaneous
+uploads/
+
+# React Chart.js
+react-chartjs-2/
+
+# Emotion files
+@emotion/
+
+# Ensure public directory is not ignored
+!public/

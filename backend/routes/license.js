@@ -1,8 +1,7 @@
 const express = require('express');
 const License = require('../models/License');
 const router = express.Router();
-const { authenticate, authorize } = require('./auth');
-const sendLicenseNotification = require('../middleware/licenseNotifier');
+const { authenticateUser, authorize } = require('../routes/auth'); // Corrected import path
 const sanitize = require('mongo-sanitize');
 const validator = require('validator');
 const crypto = require('crypto');
@@ -56,9 +55,6 @@ router.post('/activate', async (req, res) => {
     license.logUsageAction('activate'); // Log usage action
     await license.save();
 
-    // Disable email notifications
-    console.warn('Email notifications are disabled. Skipping activation email.');
-
     res.json({ message: 'License activated successfully' });
   } catch (err) {
     console.error(`Error during license activation: ${err.message}`);
@@ -67,53 +63,31 @@ router.post('/activate', async (req, res) => {
 });
 
 // Deactivate a license
-router.post('/deactivate', authenticate, async (req, res) => {
+router.post('/deactivate', authenticateUser, async (req, res) => {
   try {
     const encryptedKey = sanitize(req.body.key);
     const licenseKey = decryptLicenseKey(encryptedKey); // Decrypt the key
     const hashedKey = crypto.createHash('sha256').update(licenseKey).digest('hex'); // Hash the key
-    const email = sanitize(req.body.email);
-
-    if (!validator.isEmail(email)) {
-      return res.status(400).json({ error: 'Invalid email address' });
-    }
 
     const license = await License.findOne({ key: hashedKey });
     if (!license || !license.isActive) {
-      console.error(`Suspicious activity detected: Attempt to deactivate non-existent or inactive license key: ${hashedKey}`);
       return res.status(400).json({ error: 'License is not active or does not exist' });
     }
 
     license.isActive = false;
     license.activatedAt = null;
-    license.expiresAt = null;
     license.usageHistory.push({ action: 'deactivate' });
-    license.logUsageAction('deactivate'); // Log usage action
     await license.save();
-
-    // Disable email notifications
-    console.warn('Email notifications are disabled. Skipping deactivation email.');
 
     res.json({ message: 'License deactivated successfully' });
   } catch (err) {
-    console.error(`Error during license deactivation: ${err.message}`);
-    res.status(500).json({ error: 'Failed to deactivate license. Please contact support.' });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Notify about license expiry
-router.get('/expiry-notification', authenticate, async (req, res) => {
-  try {
-    const licenses = await License.find({
-      isActive: true,
-      expiresAt: { $lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }, // Expiring in 7 days
-    });
-
-    res.json({ licenses });
-  } catch (err) {
-    console.error(`Error fetching expiry notifications: ${err.message}`);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+// Remove the /expiry-notification route:
+router.get('/expiry-notification', authenticateUser, async (req, res) => {
+  return res.status(400).json({ error: 'License expiry notifications are not applicable.' });
 });
 
 // Validate a license
@@ -138,7 +112,7 @@ router.get('/validate', async (req, res) => {
 });
 
 // Renew a license
-router.post('/renew', authenticate, async (req, res) => {
+router.post('/renew', authenticateUser, async (req, res) => {
   try {
     const encryptedKey = sanitize(req.body.key);
     const licenseKey = decryptLicenseKey(encryptedKey); // Decrypt the key
@@ -146,7 +120,6 @@ router.post('/renew', authenticate, async (req, res) => {
 
     const license = await License.findOne({ key: hashedKey });
     if (!license) {
-      console.error(`Suspicious activity detected: Attempt to renew non-existent license key: ${hashedKey}`);
       return res.status(404).json({ error: 'License key not found' });
     }
 
@@ -155,13 +128,12 @@ router.post('/renew', authenticate, async (req, res) => {
 
     res.json({ message: 'License renewed successfully' });
   } catch (err) {
-    console.error(`Error during license renewal: ${err.message}`);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Admin: Create a new license
-router.post('/admin/create', authenticate, authorize(['admin']), async (req, res) => {
+router.post('/admin/create', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     const licenseKey = sanitize(req.body.key);
     const hashedKey = crypto.createHash('sha256').update(licenseKey).digest('hex'); // Hash the key
@@ -177,7 +149,7 @@ router.post('/admin/create', authenticate, authorize(['admin']), async (req, res
 });
 
 // Admin: Delete a license
-router.delete('/admin/delete/:id', authenticate, authorize(['admin']), async (req, res) => {
+router.delete('/admin/delete/:id', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     await License.findByIdAndDelete(req.params.id);
     res.json({ message: 'License deleted successfully' });
@@ -188,7 +160,7 @@ router.delete('/admin/delete/:id', authenticate, authorize(['admin']), async (re
 });
 
 // Admin: List all licenses
-router.get('/admin/list', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/admin/list', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     const licenses = await License.find().select('key isActive usageCount maxUsage'); // Project necessary fields
     res.json(licenses);
@@ -199,7 +171,7 @@ router.get('/admin/list', authenticate, authorize(['admin']), async (req, res) =
 });
 
 // Admin: Search licenses
-router.get('/admin/search', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/admin/search', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     const key = sanitize(req.query.key);
     const status = sanitize(req.query.status);
@@ -217,7 +189,7 @@ router.get('/admin/search', authenticate, authorize(['admin']), async (req, res)
 });
 
 // Get license usage analytics
-router.get('/analytics', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/analytics', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     const analytics = await License.aggregate([
       {
@@ -225,11 +197,10 @@ router.get('/analytics', authenticate, authorize(['admin']), async (req, res) =>
           _id: null,
           totalLicenses: { $sum: 1 },
           activeLicenses: { $sum: { $cond: ['$isActive', 1, 0] } },
-          expiredLicenses: { $sum: { $cond: [{ $lt: ['$expiresAt', new Date()] }, 1, 0] } },
         },
       },
     ]);
-    res.json(analytics[0] || { totalLicenses: 0, activeLicenses: 0, expiredLicenses: 0 });
+    res.json(analytics[0] || { totalLicenses: 0, activeLicenses: 0 });
   } catch (err) {
     console.error(`Error fetching analytics: ${err.message}`);
     res.status(500).json({ error: 'Internal server error' });
@@ -237,7 +208,7 @@ router.get('/analytics', authenticate, authorize(['admin']), async (req, res) =>
 });
 
 // Get detailed license usage analytics
-router.get('/usage-analytics', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/usage-analytics', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     const analytics = await License.aggregate([
       {
@@ -256,7 +227,7 @@ router.get('/usage-analytics', authenticate, authorize(['admin']), async (req, r
 });
 
 // Admin: Get detailed license data
-router.get('/admin/dashboard', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/admin/dashboard', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     const licenses = await License.find().select('-__v');
     res.json(licenses);
@@ -267,7 +238,7 @@ router.get('/admin/dashboard', authenticate, authorize(['admin']), async (req, r
 });
 
 // Admin: Get license usage history
-router.get('/admin/usage-history/:id', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/admin/usage-history/:id', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     const license = await License.findById(req.params.id).select('key usageHistory');
     if (!license) return res.status(404).json({ error: 'License not found' });
@@ -279,4 +250,4 @@ router.get('/admin/usage-history/:id', authenticate, authorize(['admin']), async
   }
 });
 
-module.exports = router;
+module.exports = router; // Ensure the router is exported

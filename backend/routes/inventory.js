@@ -1,10 +1,14 @@
 const express = require('express');
 const Product = require('../models/Product');
+const Inventory = require('../models/Inventory'); // Replace with your actual model
 const router = express.Router();
 const csv = require('fast-csv');
 const fs = require('fs');
 const multer = require('multer');
-const auditLogger = require('../middleware/auditLogger');
+const auditLogger = require('../middleware/auditLogger'); // Corrected import path
+const { MongoClient } = require('mongodb');
+const uri = process.env.MONGO_URI || 'mongodb://localhost:27017';
+const client = new MongoClient(uri);
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -97,25 +101,20 @@ router.delete('/:id', auditLogger('Delete Product'), async (req, res) => {
 // Get inventory statistics
 router.get('/stats', async (req, res) => {
   try {
-    const totalProducts = await Product.countDocuments();
-    const totalStockValue = await Product.aggregate([
-      { $group: { _id: null, totalValue: { $sum: { $multiply: ['$price', '$quantity'] } } } },
+    const stats = await Inventory.aggregate([
+      { $group: { _id: null, totalItems: { $sum: '$quantity' }, totalValue: { $sum: '$value' } } },
     ]);
-    res.json({
-      totalProducts,
-      totalStockValue: totalStockValue[0]?.totalValue || 0,
-    });
+    res.json(stats[0] || { totalItems: 0, totalValue: 0 });
   } catch (err) {
-    console.error('Error fetching inventory stats:', err.message);
-    res.status(500).json({ error: 'Failed to fetch inventory stats.' });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Get product counts grouped by category
 router.get('/category-stats', async (req, res) => {
   try {
-    const categoryStats = await Product.aggregate([
-      { $group: { _id: "$category", count: { $sum: 1 } } }
+    const categoryStats = await Inventory.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 }, totalValue: { $sum: '$value' } } },
     ]);
     res.json(categoryStats);
   } catch (err) {
@@ -129,32 +128,44 @@ router.post('/bulk-upload', upload.single('file'), async (req, res) => {
     if (!req.file || req.file.mimetype !== 'text/csv') {
       return res.status(400).json({ error: 'Invalid file type. Only CSV files are allowed.' });
     }
+
     const products = [];
     fs.createReadStream(req.file.path)
       .pipe(csv.parse({ headers: true }))
       .on('data', (row) => products.push(row))
       .on('end', async () => {
-        await Product.insertMany(products);
+        await client.connect();
+        const db = client.db('stck');
+        await db.collection('inventory').insertMany(products);
         fs.unlinkSync(req.file.path); // Clean up the uploaded file
         res.status(201).json({ message: 'Products uploaded successfully' });
       });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error during bulk upload:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await client.close();
   }
 });
 
 // Export inventory as CSV
 router.get('/export', async (req, res) => {
   try {
-    const products = await Product.find();
+    await client.connect();
+    const db = client.db('stck');
+    const inventory = await db.collection('inventory').find({}).toArray();
+
     const csvStream = csv.format({ headers: true });
     res.setHeader('Content-Disposition', 'attachment; filename="inventory.csv"');
     res.setHeader('Content-Type', 'text/csv');
     csvStream.pipe(res);
-    products.forEach((product) => csvStream.write(product.toObject()));
+    inventory.forEach((item) => csvStream.write(item));
     csvStream.end();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error exporting inventory:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await client.close();
   }
 });
 

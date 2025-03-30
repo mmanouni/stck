@@ -1,4 +1,4 @@
-const License = require('../models/License');
+const License = require('./models/License'); // Corrected import path
 const sanitize = require('mongo-sanitize');
 const crypto = require('crypto');
 const failedLicenseAttempts = new Map(); // Track failed attempts

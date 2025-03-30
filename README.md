@@ -8,7 +8,7 @@ STCK is a full-stack application designed for inventory management, user roles, 
 ## Features
 - Inventory management with search, filters, and bulk upload.
 - User roles and permissions management.
-- License activation and renewal.
+- Permanent license activation and renewal.
 - Audit logs and user activity tracking.
 - Multi-language support (English, Arabic, French).
 
@@ -71,10 +71,8 @@ Before setting up the project, ensure the following are installed on your system
 1. Navigate to the backend directory:
    ```bash
    cd backend
-   npm install express-session express-rate-limit helmet express-mongo-sanitize xss-clean express-validator
+   npm install express-session express-rate-limit helmet express-mongo-sanitize xss-clean express-validator mongo-sanitize nodemailer systeminformation
    ```
-
-2. 
 
 2. Create a `.env` file in the `backend` directory:
    ```plaintext
@@ -83,12 +81,9 @@ Before setting up the project, ensure the following are installed on your system
    JWT_SECRET=your_jwt_secret
    LICENSE_ENCRYPTION_KEY=your_32_byte_hex_key
    LICENSE_ENCRYPTION_IV=your_16_byte_hex_iv
-   EMAIL_USER=your_email@example.com
-   EMAIL_PASS=your_email_password
    ```
    - Replace `your_jwt_secret` with a secure secret key for JWT.
    - Replace `your_32_byte_hex_key` and `your_16_byte_hex_iv` with valid encryption keys.
-   - Replace `your_email@example.com` and `your_email_password` with valid email credentials for notifications.
 3. Install backend dependencies:
    ```bash
    npm install
@@ -156,7 +151,65 @@ The backend exposes a RESTful API. Below are some key endpoints:
 - **PUT** `/api/roles/:id`: Update a role.
 - **DELETE** `/api/roles/:id`: Delete a role.
 
+### License
+- **POST** `/api/license/activate`: Activate a license.
+- **POST** `/api/license/deactivate`: Deactivate a license.
+- **POST** `/api/license/renew`: Renew a license.
+- **GET** `/api/license/validate`: Validate a license.
+- **GET** `/api/license/analytics`: Get license usage analytics.
+
+### User Activity Logs
+- **GET** `/api/user-activity-logs`: Fetch all user activity logs (admin only).
+- **GET** `/api/user-activity-logs/by-user/:userId`: Fetch activity logs for a specific user (admin only).
+
+### Roles
+- **POST** `/api/roles/initialize`: Initialize predefined roles (admin only).
+- **PUT** `/api/roles/delegate-admin`: Temporarily delegate admin role to a manager (superadmin only).
+
+### Inventory
+- **GET** `/api/inventory/stats`: Fetch inventory statistics, including total products and stock value.
+- **GET** `/api/inventory/category-stats`: Fetch product counts grouped by category.
+- **POST** `/api/inventory/bulk-upload`: Bulk upload products via a CSV file.
+- **GET** `/api/inventory/export`: Export inventory data as a CSV file.
+- **GET** `/api/inventory/trends`: Fetch inventory trends over time.
+
+### License
+- **GET** `/api/license/usage-analytics`: Fetch detailed license usage analytics.
+- **GET** `/api/license/admin/dashboard`: Fetch detailed license data for the admin dashboard.
+- **GET** `/api/license/admin/usage-history/:id`: Fetch the usage history of a specific license.
+
 For a full list of endpoints, refer to the `routes` directory in the backend.
+
+---
+
+## Middleware
+
+### Audit Logger
+The `auditLogger` middleware logs user actions to the database for auditing purposes. It is used in routes like inventory and transactions.
+
+### License Validator
+The `licenseValidator` middleware validates license keys and enforces usage limits. It also tracks failed attempts and blocks IPs temporarily after repeated invalid attempts.
+
+### Permission Checker
+The `checkPermission` middleware ensures that users have the required permissions to access specific routes. It checks the user's role and associated permissions.
+
+---
+
+## Predefined Roles
+The application includes predefined roles with specific permissions:
+
+1. **Superadmin**: Full access to all features and settings.
+2. **Admin**: Manage users, view reports, and oversee operations.
+3. **Manager**: Manage inventory and oversee sellers and inventory clerks.
+4. **Seller**: Sell products and view sales reports.
+5. **Inventory Clerk**: Add and update product information in the inventory.
+
+---
+
+## Real-Time Features
+The application uses **Socket.IO** for real-time updates:
+- **Inventory Updates**: Clients are notified when inventory changes occur.
+- **Audit Log Updates**: Clients are notified when new audit logs are added.
 
 ---
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const UserActivityLog = require('../models/UserActivityLog');
-const { authenticate, authorize } = require('./auth');
+const { authenticate, authorize } = require('../routes/auth'); // Corrected import path
 const router = express.Router();
 
 // Get all user activity logs (admin only)

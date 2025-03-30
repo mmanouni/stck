@@ -1,6 +1,6 @@
 const express = require('express');
 const Role = require('../models/Role');
-const { authenticate, authorize } = require('./auth');
+const { authenticate, authorize } = require('../routes/auth'); // Corrected import path
 const router = express.Router();
 
 // Create a new role (admin only)

@@ -3,6 +3,8 @@ import axios from 'axios';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Button, Pagination, List, ListItem, CircularProgress, Typography } from '@mui/material';
 import { Line } from 'react-chartjs-2';
 import { io } from 'socket.io-client';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DatePicker } from '@mui/x-date-pickers';
 
 function AuditLogs() {
@@ -101,16 +103,18 @@ function AuditLogs() {
         style={{ marginBottom: '20px' }}
       />
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <DatePicker
-          label="Start Date"
-          value={startDate}
-          onChange={(newValue) => setStartDate(newValue)}
-        />
-        <DatePicker
-          label="End Date"
-          value={endDate}
-          onChange={(newValue) => setEndDate(newValue)}
-        />
+        <LocalizationProvider dateAdapter={AdapterDateFns}>
+          <DatePicker
+            label="Start Date"
+            value={startDate}
+            onChange={(newValue) => setStartDate(newValue)}
+          />
+          <DatePicker
+            label="End Date"
+            value={endDate}
+            onChange={(newValue) => setEndDate(newValue)}
+          />
+        </LocalizationProvider>
         <Button variant="contained" onClick={handleDateFilter}>
           Apply Filter
         </Button>

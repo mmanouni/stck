@@ -14,7 +14,7 @@ function Transactions() {
   const [yearlySummary, setYearlySummary] = useState([]);
   const [categorySummary, setCategorySummary] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [language, setLanguage] = useState('en'); // Assuming language state is available
+  const [language, setLanguage] = useState('en'); // Add language state
 
   useEffect(() => {
     setLoading(true);
@@ -87,12 +87,16 @@ function Transactions() {
       .catch(error => console.error(error));
   };
 
-  const handleDelete = (id) => {
-    axios.delete(`/api/transactions/${id}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-    })
-      .then(() => setTransactions(transactions.filter(t => t._id !== id)))
-      .catch(error => console.error(error));
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`/api/transactions/${id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      setTransactions(transactions.filter((transaction) => transaction._id !== id));
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      alert('Failed to delete transaction.');
+    }
   };
 
   const incomeExpenseChartData = {

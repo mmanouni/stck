@@ -1,31 +1,30 @@
 const express = require('express');
 const AuditLog = require('../models/AuditLog');
 const router = express.Router();
-const { authenticate, authorize } = require('./auth');
-const csv = require('fast-csv');
-const fs = require('fs');
+const { authenticateUser, authorize } = require('../routes/auth'); // Corrected import path
+const csv = require('fast-csv'); // Add missing import
 
 // Get audit logs with pagination and filtering
-router.get('/', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     const { page = 1, limit = 10, action } = req.query;
     const query = action ? { action: { $regex: action, $options: 'i' } } : {};
     const logs = await AuditLog.find(query)
       .populate('userId', 'username')
       .select('userId action timestamp') // Project only necessary fields
-      .skip((page - 1) * limit)
+      .skip((parseInt(page) - 1) * parseInt(limit))
       .limit(parseInt(limit))
       .sort({ timestamp: -1 });
     const total = await AuditLog.countDocuments(query);
     res.json({ logs, total, page: parseInt(page), limit: parseInt(limit) });
   } catch (err) {
     console.error('Error fetching audit logs:', err.message);
-    res.status(500).json({ error: 'Failed to fetch audit logs. Please try again later.' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Get real-time audit logs
-router.get('/real-time', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/real-time', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     const logs = await AuditLog.find()
       .populate('userId', 'username')
@@ -38,13 +37,13 @@ router.get('/real-time', authenticate, authorize(['admin']), async (req, res) =>
 });
 
 // Export audit logs as CSV with pagination
-router.get('/export', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/export', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
     const { page = 1, limit = 100 } = req.query;
     const logs = await AuditLog.find()
       .populate('userId', 'username')
       .sort({ timestamp: -1 })
-      .skip((page - 1) * limit)
+      .skip((parseInt(page) - 1) * parseInt(limit)) // Parse `limit` as an integer
       .limit(parseInt(limit));
     const csvStream = csv.format({ headers: true });
     res.setHeader('Content-Disposition', 'attachment; filename="audit_logs.csv"');
@@ -58,9 +57,9 @@ router.get('/export', authenticate, authorize(['admin']), async (req, res) => {
 });
 
 // Get analytics for user activity logs
-router.get('/analytics', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/analytics', authenticateUser, authorize(['admin']), async (req, res) => {
   try {
-    const analytics = await UserActivityLog.aggregate([
+    const analytics = await AuditLog.aggregate([
       {
         $group: {
           _id: '$action',
@@ -75,4 +74,4 @@ router.get('/analytics', authenticate, authorize(['admin']), async (req, res) =>
   }
 });
 
-module.exports = router;
+module.exports = router; // Ensure the router is exported

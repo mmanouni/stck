@@ -28,7 +28,12 @@ userSchema.pre('save', async function (next) {
 });
 
 userSchema.methods.comparePassword = async function (password) {
-  return bcrypt.compare(password, this.password);
+  try {
+    return await bcrypt.compare(password, this.password);
+  } catch (err) {
+    console.error('Error comparing password:', err.message);
+    throw new Error('Password comparison failed.');
+  }
 };
 
 userSchema.methods.isLocked = function () {

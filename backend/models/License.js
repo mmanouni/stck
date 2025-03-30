@@ -5,6 +5,10 @@ if (!process.env.LICENSE_ENCRYPTION_KEY || !process.env.LICENSE_ENCRYPTION_IV) {
   throw new Error('LICENSE_ENCRYPTION_KEY and LICENSE_ENCRYPTION_IV must be set in the environment variables.');
 }
 
+// Use the environment variables
+const encryptionKey = process.env.LICENSE_ENCRYPTION_KEY;
+const encryptionIv = process.env.LICENSE_ENCRYPTION_IV;
+
 const licenseSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true }, // Store hashed license key
   isActive: { type: Boolean, default: false },
@@ -20,10 +24,7 @@ const licenseSchema = new mongoose.Schema({
   hardwareId: { type: String, required: false }, // Store hashed hardware ID
 });
 
-// Add indexes for better performance
-licenseSchema.index({ key: 1 }); // Index for faster key lookups
 licenseSchema.index({ isActive: 1 }); // Index for active/inactive queries
-licenseSchema.index({ expiresAt: 1 }); // Index for expiry-related queries
 
 // Pre-save hook to hash the license key
 licenseSchema.pre('save', function (next) {
