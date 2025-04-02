@@ -1,6 +1,6 @@
 import React from 'react';
 
-function Profile() {
+const Profile: React.FC = () => {
   return (
     <div>
       <h1>Profile Page</h1>
@@ -9,6 +9,6 @@ function Profile() {
       </div>
     </div>
   );
-}
+};
 
-export default Profile;
+export default Profile; 

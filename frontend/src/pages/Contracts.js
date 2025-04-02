@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Button, Typography, Dialog, DialogContent, DialogActions, CircularProgress } from '@mui/material';
+import { Typography, CircularProgress } from '@mui/material';
 
 function Contracts() {
   const [contracts, setContracts] = useState([]);

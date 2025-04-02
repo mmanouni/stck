@@ -1,17 +1,46 @@
 const mongoose = require('mongoose');
 
 const inventorySchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  category: { type: String, required: true },
-  quantity: { type: Number, required: true },
-  value: { type: Number, required: true },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+  name: {
+    type: String,
+    required: [true, 'Name is required'],
+    trim: true
+  },
+  quantity: {
+    type: Number,
+    required: [true, 'Quantity is required'],
+    min: [0, 'Quantity cannot be negative']
+  },
+  price: {
+    type: Number,
+    required: [true, 'Price is required'],
+    min: [0, 'Price cannot be negative']
+  },
+  category: {
+    type: String,
+    trim: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  lastUpdated: {
+    type: Date,
+    default: Date.now
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }
+}, {
+  timestamps: true
 });
 
-inventorySchema.pre('save', function (next) {
-  this.updatedAt = Date.now();
-  next();
-});
+// Add indexes for better query performance
+inventorySchema.index({ name: 1 });
+inventorySchema.index({ category: 1 });
 
-module.exports = mongoose.model('Inventory', inventorySchema);
+const Inventory = mongoose.model('Inventory', inventorySchema);
+
+module.exports = Inventory;

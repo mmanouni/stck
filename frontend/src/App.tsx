@@ -1,34 +1,25 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
-import Dashboard from './pages/Dashboard';
+import InventoryPage from './pages/InventoryPage';
+import Contracts from './pages/Contracts';
 import Profile from './pages/Profile';
-import ErrorBoundary from './ErrorBoundary';
+import ThemeSwitcher from './components/ThemeSwitcher';
 
-function App() {
+const App: React.FC = () => {
   return (
     <Router>
-      <Navbar />
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <ErrorBoundary>
-              <Dashboard />
-            </ErrorBoundary>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ErrorBoundary>
-              <Profile />
-            </ErrorBoundary>
-          }
-        />
-      </Routes>
+      <ThemeSwitcher>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<InventoryPage />} />
+          <Route path="/inventory" element={<InventoryPage />} />
+          <Route path="/contracts" element={<Contracts />} />
+          <Route path="/profile" element={<Profile />} />
+        </Routes>
+      </ThemeSwitcher>
     </Router>
   );
-}
+};
 
 export default App;

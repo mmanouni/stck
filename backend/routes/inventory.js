@@ -10,11 +10,13 @@ const { MongoClient } = require('mongodb');
 const sanitize = require('mongo-sanitize'); // Ensure this is imported
 const uri = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const client = new MongoClient(uri);
+const auth = require('../middleware/auth');
+const { check, validationResult } = require('express-validator');
 
 const upload = multer({ dest: 'uploads/' });
 
 // Get all products with pagination
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const products = await Product.find()
@@ -28,7 +30,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get a single product
-router.get('/:id', async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     res.json(product);
@@ -38,9 +40,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // Search products by name or category
-router.get('/search', async (req, res) => {
+router.get('/search', auth, async (req, res) => {
   try {
-    const query = sanitize(req.query.query); // Sanitize input
+    const query = sanitize(req.query.query);
     const products = await Product.find({
       $or: [
         { name: { $regex: query, $options: 'i' } },
@@ -68,44 +70,65 @@ router.get('/suggestions', async (req, res) => {
 });
 
 // Add a new product
-router.post('/', auditLogger('Add Product'), async (req, res) => {
+router.post('/', auth, upload.single('image'), async (req, res) => {
   try {
-    const { name, description, price, quantity, category } = req.body;
-    const newProduct = new Product({ name, description, price, quantity, category });
-    await newProduct.save();
-    res.status(201).json(newProduct);
+    const product = new Product(req.body);
+    if (req.file) {
+      product.image = req.file.path;
+    }
+    await product.save();
+    res.status(201).json(product);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
 // Update a product
-router.put('/:id', auditLogger('Update Product'), async (req, res) => {
+router.put('/:id', auth, upload.single('image'), async (req, res) => {
   try {
-    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json(updatedProduct);
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    if (req.file) {
+      product.image = req.file.path;
+      await product.save();
+    }
+    res.json(product);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
 // Delete a product
-router.delete('/:id', auditLogger('Delete Product'), async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   try {
     await Product.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Product deleted' });
+    res.json({ message: 'Product deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
 // Get inventory statistics
-router.get('/stats', async (req, res) => {
+router.get('/stats', auth, async (req, res) => {
   try {
     const stats = await Inventory.aggregate([
-      { $group: { _id: null, totalItems: { $sum: '$quantity' }, totalValue: { $sum: '$value' } } },
+      {
+        $group: {
+          _id: null,
+          totalItems: { $sum: 1 },
+          totalValue: { $sum: { $multiply: ['$quantity', '$price'] } },
+          lowStock: {
+            $sum: {
+              $cond: [{ $lte: ['$quantity', 10] }, 1, 0]
+            }
+          }
+        }
+      }
     ]);
-    res.json(stats[0] || { totalItems: 0, totalValue: 0 });
+    res.json(stats[0] || { totalItems: 0, totalValue: 0, lowStock: 0 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -191,6 +214,138 @@ router.get('/trends', async (req, res) => {
     res.json(trends);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// @route   GET api/inventory
+// @desc    Get all inventory items
+// @access  Private
+router.get('/', auth, async (req, res) => {
+  try {
+    const inventory = await Inventory.find({ createdBy: req.user.id });
+    res.json(inventory);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   GET api/inventory/:id
+// @desc    Get a single inventory item
+// @access  Private
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const item = await Inventory.findById(req.params.id);
+    if (!item) {
+      return res.status(404).json({ msg: 'Item not found' });
+    }
+    res.json(item);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   POST api/inventory
+// @desc    Create an inventory item
+// @access  Private
+router.post('/', [
+  auth,
+  [
+    check('name', 'Name is required').not().isEmpty(),
+    check('quantity', 'Quantity is required').isNumeric(),
+    check('price', 'Price is required').isNumeric()
+  ]
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const newItem = new Inventory({
+      ...req.body,
+      createdBy: req.user.id
+    });
+
+    const item = await newItem.save();
+    res.json(item);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   PUT api/inventory/:id
+// @desc    Update an inventory item
+// @access  Private
+router.put('/:id', auth, async (req, res) => {
+  try {
+    let item = await Inventory.findById(req.params.id);
+    if (!item) {
+      return res.status(404).json({ msg: 'Item not found' });
+    }
+
+    // Make sure user owns the item
+    if (item.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ msg: 'Not authorized' });
+    }
+
+    item = await Inventory.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true }
+    );
+
+    res.json(item);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   DELETE api/inventory/:id
+// @desc    Delete an inventory item
+// @access  Private
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const item = await Inventory.findById(req.params.id);
+    if (!item) {
+      return res.status(404).json({ msg: 'Item not found' });
+    }
+
+    // Make sure user owns the item
+    if (item.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ msg: 'Not authorized' });
+    }
+
+    await item.remove();
+    res.json({ msg: 'Item removed' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   GET api/inventory/stats
+// @desc    Get inventory statistics
+// @access  Private
+router.get('/stats', auth, async (req, res) => {
+  try {
+    const stats = await Inventory.aggregate([
+      { $match: { createdBy: req.user.id } },
+      { 
+        $group: { 
+          _id: null, 
+          totalItems: { $sum: '$quantity' }, 
+          totalValue: { $sum: { $multiply: ['$price', '$quantity'] } } 
+        } 
+      }
+    ]);
+    res.json(stats[0] || { totalItems: 0, totalValue: 0 });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
   }
 });
 

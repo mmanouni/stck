@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import InventoryList from '../../components/InventoryList';
+import InventoryComponent from '../components/InventoryList'; // Ensure correct import
 
-function InventoryList() {
+function InventoryPage() { // ✅ Changed name to avoid conflict
     const [inventory, setInventory] = useState([]);
 
     useEffect(() => {
-        // Simulate fetching inventory data
         fetch('/api/inventory')
             .then((response) => response.json())
             .then((data) => setInventory(data))
@@ -15,9 +14,9 @@ function InventoryList() {
     return (
         <div>
             <h1>Inventory Page</h1>
-            <InventoryList inventory={inventory} />
+            <InventoryComponent inventory={inventory} /> {/* ✅ Use correct component */}
         </div>
     );
 }
 
-export default InventoryList;
+export default InventoryPage; // ✅ Changed export name
